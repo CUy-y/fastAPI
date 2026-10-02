@@ -2,6 +2,7 @@ from fastapi import FastAPI
 import asyncio
 import time
 
+#创建fastapi实例
 app=FastAPI()
 
 @app.get("/async")
