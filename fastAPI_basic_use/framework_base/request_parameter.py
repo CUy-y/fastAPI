@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from pydantic import BaseModel
+from pydantic import BaseModel,Field
 
 
 app=FastAPI()
@@ -14,8 +14,8 @@ class User(BaseModel):
     password:str
 
 class Book(BaseModel):
-    book_name:str
-    book_price:int
+    book_name:str=Field(...,gt=5,lt=256,description="图书名称，必须大于5小于256")
+    book_price:int=Field(...,gt=50,lt=101,description="图书价格，必须大于50小于101")
 
 @app.post("/register")
 async def register(user:User):
