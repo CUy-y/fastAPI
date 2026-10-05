@@ -1,50 +1,61 @@
-from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional
- 
-# 用户请求
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
 class UserRequest(BaseModel):
-    username: str
-    password: str
- 
-# 用户信息基础数据模型
-class UserInfoBase(BaseModel):
-    nickname: Optional[str] = Field(None, max_length=50, description="昵称")
-    avatar: Optional[str] = Field(None, max_length=255, description="头像URL")
-    gender: Optional[str] = Field(None, max_length=10, description="性别")
-    bio: Optional[str] = Field(None, max_length=500, description="个人简介")
- 
- 
-class UserInfoResponse(UserInfoBase):
+    username: str = Field(min_length=3, max_length=50)
+    password: str = Field(min_length=6, max_length=72)
+
+    @field_validator("username")
+    @classmethod
+    def strip_username(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("用户名不能为空")
+        return value
+
+    @field_validator("password")
+    @classmethod
+    def bcrypt_length(cls, value: str) -> str:
+        if len(value.encode("utf-8")) > 72:
+            raise ValueError("密码 UTF-8 编码后不能超过 72 字节")
+        return value
+
+
+class UserInfoResponse(BaseModel):
     id: int
     username: str
- 
-    # 模型类配置
-    model_config = ConfigDict(
-        from_attributes=True  # 允许从 ORM 对象属性中取值
-    )
- 
- 
-# data 数据类型
+    nickname: str | None = None
+    avatar: str | None = None
+    gender: str | None = None
+    bio: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class UserAuthResponse(BaseModel):
     token: str
-    user_info: UserInfoResponse = Field(..., alias="userInfo")
- 
-    # 模型类配置
-    model_config = ConfigDict(
-        populate_by_name=True,  # alias / 字段名兼容
-        from_attributes=True   # 允许从 ORM 对象属性中取值
-    )
+    user_info: UserInfoResponse = Field(alias="userInfo")
 
-# 更新用户信息的模型类
+    model_config = ConfigDict(populate_by_name=True)
+
+
 class UserUpdateRequest(BaseModel):
-    nickname: str = None
-    avatar: str = None
-    gender: str = None
-    bio: str = None
-    phone: str = None
+    nickname: str | None = Field(default=None, max_length=50)
+    avatar: str | None = Field(default=None, max_length=255)
+    gender: str | None = Field(default=None, pattern="^(male|female|unknown)$")
+    bio: str | None = Field(default=None, max_length=500)
+    phone: str | None = Field(default=None, max_length=20)
 
-# 修改密码的模型类
+
 class UserChangePasswordRequest(BaseModel):
-    old_password: str = Field(..., alias="oldPassword", description="旧密码")
-    new_password: str = Field(..., min_length=6, alias="newPassword", description="新密码")
+    old_password: str = Field(alias="oldPassword", min_length=1, max_length=72)
+    new_password: str = Field(alias="newPassword", min_length=6, max_length=72)
 
+    @field_validator("old_password", "new_password")
+    @classmethod
+    def bcrypt_length(cls, value: str) -> str:
+        if len(value.encode("utf-8")) > 72:
+            raise ValueError("密码 UTF-8 编码后不能超过 72 字节")
+        return value
+
+    model_config = ConfigDict(populate_by_name=True)

@@ -1,103 +1,88 @@
-# 用户注册
-from fastapi.params import Depends
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from toutiao_.common.result import Result
-from toutiao_.config.db_conf import get_db
-from toutiao_.crud import users
-from toutiao_.schemas.users import UserAuthResponse, UserRequest
-from toutiao_.utils.response import success_response
+from common.result import Result
+from config.db_conf import get_db
+from crud import users as users_crud
+from models.users import User
+from schemas.users import (
+    UserAuthResponse,
+    UserChangePasswordRequest,
+    UserInfoResponse,
+    UserRequest,
+    UserUpdateRequest,
+)
+from utils.auth import get_current_user
+
+
+router = APIRouter(prefix="/api/user", tags=["users"])
 
 
 @router.post("/register")
-async def register(user_data: UserRequest, db: AsyncSession = Depends(get_db)):
-    # 根据用户名查询数据库
-    db_user = await users.get_user_by_username(db, user_data.username)
-    if db_user:
-        return Result.error("用户已存在", 400)
- 
-    # 新增用户
-    user = await users.create_user(db, user_data)
- 
-    # 生成 Token
-    token = await users.create_token(db, user.id)
- 
-    # return {
-    #     "code": 200,
-    #     "message": "注册成功",
-    #     "data": {
-    #         "token": token,
-    #         "userInfo": {
-    #             "id": user.id,
-    #             "username": user_data.username,
-    #             "bio": user.bio,
-    #             "avatar": user.avatar
-    #         }
-    #     }
-    # }
- 
-    ## 构建响应数据：token + 用户信息
-    # model_validate: 将 ORM 模型对象转换为 Pydantic 响应模型
-    response_data = UserAuthResponse(token=token, userInfo=UserInfoResponse.model_validate(user))
-    return success_response(data=response_data)
+async def register(
+    user_data: UserRequest, db: AsyncSession = Depends(get_db)
+):
+    if await users_crud.get_user_by_username(db, user_data.username):
+        raise HTTPException(status_code=409, detail="用户名已存在")
 
-# 用户登录
+    user = await users_crud.create_user(db, user_data)
+    token = await users_crud.create_token(db, user.id)
+    data = UserAuthResponse(
+        token=token, userInfo=UserInfoResponse.model_validate(user)
+    )
+    return Result.success(message="注册成功", data=data)
+
+
 @router.post("/login")
-async def login(user_data: UserRequest, db: AsyncSession = Depends(get_db)):
-    # 登录逻辑：验证用户是否存在 -> 验证密码 -> 生成 Token -> 响应结果
-    user = await users.authenticate_user(db, user_data.username, user_data.password)
-    if not user:
+async def login(
+    user_data: UserRequest, db: AsyncSession = Depends(get_db)
+):
+    user = await users_crud.authenticate_user(
+        db, user_data.username, user_data.password
+    )
+    if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="用户名或密码错误"
+            detail="用户名或密码错误",
+            headers={"WWW-Authenticate": "Bearer"},
         )
- 
-    token = await users.create_token(db, user.id)
-    response_data = UserAuthResponse(
-        token=token,
-        user_info=UserInfoResponse.model_validate(user)
-    )
- 
-    return success_response( data=response_data)
 
-# 查 Token 查用户 -> 封装 crud -> 功能整合成一个工具函数 -> 路由导入使用：依赖注入
+    token = await users_crud.create_token(db, user.id)
+    data = UserAuthResponse(
+        token=token, userInfo=UserInfoResponse.model_validate(user)
+    )
+    return Result.success(message="登录成功", data=data)
+
+
 @router.get("/info")
 async def get_user_info(user: User = Depends(get_current_user)):
-    return success_response(
-        message="获取用户信息成功",
-        data=UserInfoResponse.model_validate(user)
+    return Result.success(
+        message="获取用户信息成功", data=UserInfoResponse.model_validate(user)
     )
 
-# 修改用户信息：验证Token -> 更新（用户输入数据 put提交 -> 请求体参数 -> 定义Pydantic模型类） -> 响应结果
-# 参数：用户输入的 + 验证Token的 + db（调用更新的方法）
+
 @router.put("/update")
 async def update_user_info(
     user_data: UserUpdateRequest,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
-    user = await users.update_user(db, user.username, user_data)
-    return success_response(
+    updated_user = await users_crud.update_user(db, user, user_data)
+    return Result.success(
         message="更新用户信息成功",
-        data=UserInfoResponse.model_validate(user)
+        data=UserInfoResponse.model_validate(updated_user),
     )
+
 
 @router.put("/password")
 async def update_password(
     password_data: UserChangePasswordRequest,
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
-    res_change_pwd = await users.change_password(
-        db,
-        user,
-        password_data.old_password,
-        password_data.new_password
+    changed = await users_crud.change_password(
+        db, user, password_data.old_password, password_data.new_password
     )
- 
-    if not res_change_pwd:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="修改密码失败，请检查旧密码"
-        )
- 
-    return success_response(message="修改密码成功")
+    if not changed:
+        raise HTTPException(status_code=400, detail="旧密码不正确")
+    return Result.success(message="密码修改成功")

@@ -7,7 +7,7 @@ from starlette import status
  
 # 开发模式：返回详细错误信息
 # 生产模式：返回简化错误信息
-DEBUG_MODE = True  # 教学项目保持开启
+DEBUG_MODE = False
  
  
 async def http_exception_handler(request: Request, exc: HTTPException):
@@ -22,6 +22,17 @@ async def http_exception_handler(request: Request, exc: HTTPException):
             "message": exc.detail,
             "data": None
         }
+    )
+
+
+async def request_validation_error_handler(request: Request, exc):
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={
+            "code": status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "message": "请求参数不正确",
+            "data": None,
+        },
     )
  
  
@@ -106,6 +117,3 @@ async def general_exception_handler(request: Request, exc: Exception):
             "data": error_data
         }
     )
- 
- 
- 

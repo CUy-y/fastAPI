@@ -1,12 +1,18 @@
-from passlib.context import CryptContext
- 
-# 创建密码上下文
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
- 
-# 密码加密
-def get_hash_password(password : str):
-    return pwd_context.hash(password)
- 
-# 密码验证：verify 返回值是布尔型
-def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
+import bcrypt
+
+
+def get_hash_password(password: str) -> str:
+    password_bytes = password.encode("utf-8")
+    if len(password_bytes) > 72:
+        raise ValueError("密码 UTF-8 编码后不能超过 72 字节")
+    return bcrypt.hashpw(password_bytes, bcrypt.gensalt()).decode("ascii")
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    password_bytes = plain_password.encode("utf-8")
+    if len(password_bytes) > 72:
+        return False
+    try:
+        return bcrypt.checkpw(password_bytes, hashed_password.encode("ascii"))
+    except (ValueError, TypeError, UnicodeEncodeError):
+        return False
