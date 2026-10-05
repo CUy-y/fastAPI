@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from routers import news,users
 from fastapi.middleware.cors import CORSMiddleware
+from routers import news, users, favorite, history
  
 from utils.exception_handlers import register_exception_handlers
  
@@ -18,6 +19,8 @@ app.include_router(news.router)
 app.include_router(users.router)
  # 挂载路由/注册路由
 app.include_router(favorite.router)
+
+app.include_router(history.router)
 # 允许的来源（可以是域名列表）
 origins = [
     "http://localhost",
