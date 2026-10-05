@@ -1,25 +1,28 @@
 from fastapi import FastAPI
-from routers import news
+from routers import news,users
 from fastapi.middleware.cors import CORSMiddleware
  
+from utils.exception_handlers import register_exception_handlers
+ 
 app = FastAPI()
+ 
+# 注册异常处理器
+register_exception_handlers(app)
  
 @app.get("/")
 async def root():
     return {"message": "Hello World"}
  
 # 挂载路由/注册路由
-# 把 news.py 里面定义的那些接口注册到我的主程序 app 里。
 app.include_router(news.router)
- # 挂载路由/注册路由
 app.include_router(users.router)
-
+ 
 # 允许的来源（可以是域名列表）
-# origins = [
-#     "http://localhost",
-#     "http://localhost:3000",
-#     "https://your-frontend-domain.com"  # 你的服务器IP/域名
-# ]
+origins = [
+    "http://localhost",
+    "http://localhost:3000",
+    "https://your-frontend-domain.com"  # 你的服务器IP/域名
+]
  
 # 添加 CORS 中间件
 app.add_middleware(

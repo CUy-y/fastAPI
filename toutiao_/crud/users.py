@@ -22,3 +22,29 @@ async def create_user(db: AsyncSession, user_data: UserRequest):
     await db.commit()
     await db.refresh(user)  #刷新,从数据库读最新的
     return user
+
+# 生成 Token
+async def create_token(db: AsyncSession, user_id: int):
+    # 生成 Token
+    token = str(uuid.uuid4())
+ 
+    # 设置过期时间
+    expires_at = datetime.now() + timedelta(days=7)
+ 
+    # 查询数据库当前用户是否有 Token
+    query = select(UserToken).where(UserToken.user_id == user_id)
+    result = await db.execute(query)
+    user_token = result.scalar_one_or_none()
+ 
+    # 有：更新
+    if user_token:
+        user_token.token = token
+        user_token.expires_at = expires_at
+        await db.commit()
+    # 没有： 添加
+    else:
+        user_token = UserToken(user_id=user_id, token=token, expires_at=expires_at)
+        db.add(user_token)
+        await db.commit()
+ 
+    return token
