@@ -27,3 +27,50 @@ async def get_categories(db: AsyncSession = Depends(get_db), skip: int = 0, limi
  
     # 使用统一返回对象，避免每个接口都手写 code/message/data
     return Result.success(categories)
+
+@router.get("/list", response_model=PageResult)
+async def get_new_list(
+        category_id: int = Query(..., alias="categoryId"),
+        page: int = 1,
+        page_size: int = Query(10, alias="pageSize", le=100),
+        db: AsyncSession = Depends(get_db)
+):
+    """
+    获取新闻列表
+    :param category_id: 新闻分类 ID
+    :param page: 当前页码
+    :param page_size: 每页数据条数
+    :param db: 数据库异步会话
+    :return: 分页格式的新闻列表响应
+    """
+    offset = (page - 1) * page_size
+    news_list = await news.get_news_list(db, category_id, offset, page_size)
+ 
+    total = await news.get_news_count(db, category_id)
+ 
+    #（跳过的 + 当前列表里面的数量）< 总量
+    has_more = (offset + len(news_list)) < total
+ 
+    return PageResult.page(
+        list_data=news_list,
+        total=total,
+        has_more=has_more
+    )
+
+@router.get("/detail", response_model=Result)
+async def get_news_detail(
+        news_id: int = Query(..., alias="id"),
+        db: AsyncSession = Depends(get_db)
+):
+    """
+    获取新闻详情
+    :param news_id:
+    :param db:
+    :return:
+    """
+    news_detail = await news.get_news_detail(db, news_id)
+ 
+    if news_detail is None:
+        return Result.error(code=404,data="该新闻不存在")
+ 
+    return Result.success(news_detail)
