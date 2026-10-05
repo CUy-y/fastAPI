@@ -1,25 +1,24 @@
-from fastapi import APIRouter
-from fastapi.params import Depends
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from config.db_confing import get_db
+from models.users import User
 from schemas.users import UserRequest
+from utils import security
  
-router = APIRouter(prefix="/api/user", tags=["users"])
+# 根据用户名查询数据库
+async def get_user_by_username(db: AsyncSession, username: str):
+    query = select(User).where(User.username == username)
+    result = await db.execute(query)
+ 
+    return result.scalar_one_or_none()
  
  
-# 用户注册
-@router.post("register")
-async def register(user_data: UserRequest, db: AsyncSession = Depends(get_db)):
-    return {
-        "code": 200,
-        "message": "注册成功",
-        "data": {
-            "token": "用户访问令牌",
-            "userInfo": {
-                "id": 1,
-                "username": user_data.username,
-                "bio": "这个人很懒，什么都没留下",
-                "avatar": "https://fastly.jsdelivr.net/npm/@vant/assets/cat.jpeg"
-            }
-        }
-    }
+# 新增用户
+async def create_user(db: AsyncSession, user_data: UserRequest):
+    # 密码加密
+    hashed_password = security.get_hash_password(user_data.password)
+    user = User(username=user_data.username, password=hashed_password)
+ 
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)  #刷新,从数据库读最新的
+    return user
