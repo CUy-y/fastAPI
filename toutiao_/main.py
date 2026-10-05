@@ -16,7 +16,8 @@ async def root():
 # 挂载路由/注册路由
 app.include_router(news.router)
 app.include_router(users.router)
- 
+ # 挂载路由/注册路由
+app.include_router(favorite.router)
 # 允许的来源（可以是域名列表）
 origins = [
     "http://localhost",
