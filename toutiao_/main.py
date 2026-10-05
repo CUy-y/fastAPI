@@ -11,7 +11,9 @@ async def root():
 # 挂载路由/注册路由
 # 把 news.py 里面定义的那些接口注册到我的主程序 app 里。
 app.include_router(news.router)
- 
+ # 挂载路由/注册路由
+app.include_router(users.router)
+
 # 允许的来源（可以是域名列表）
 # origins = [
 #     "http://localhost",

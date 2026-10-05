@@ -1,9 +1,10 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from fastapi.params import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from common.result import Result
 from crud import news
 from config.db_conf import get_db
+from toutiao_.common.page_result import PageResult
  
 # 创建新闻模块路由
 # prefix：当前文件下所有接口都会自动加上 /api/news 前缀
@@ -74,3 +75,72 @@ async def get_news_detail(
         return Result.error(code=404,data="该新闻不存在")
  
     return Result.success(news_detail)
+
+@router.get("/detail", response_model=Result)
+async def get_news_detail(
+        news_id: int = Query(..., alias="id"),
+        db: AsyncSession = Depends(get_db)
+):
+    """
+    获取新闻详情、新闻浏览量 + 1
+    :param news_id:
+    :param db:
+    :return:
+    """
+ 
+    # 获取新闻详情
+    news_detail = await news.get_news_detail(db, news_id)
+ 
+    if news_detail is None:
+        return Result.error(code=404,data="该新闻不存在")
+ 
+    # 新闻浏览量 + 1
+    news_res = await news.increase_new_views(db, news_id)
+ 
+    if not news_res:
+        return Result.error(code=404, data="更新浏览量失败")
+ 
+    return Result.success(news_detail)
+
+@router.get("/detail", response_model=Result)
+async def get_news_detail(
+        news_id: int = Query(..., alias="id"),
+        db: AsyncSession = Depends(get_db)
+):
+    """
+    获取新闻详情、新闻浏览量 + 1、相关推荐
+    """
+ 
+    # 获取新闻详情
+    news_detail = await news.get_news_detail(db, news_id)
+ 
+    if news_detail is None:
+        return Result.error(code=404, data="该新闻不存在")
+ 
+    # 新闻浏览量 + 1
+    news_res = await news.increase_new_views(db, news_id)
+ 
+    if not news_res:
+        return Result.error(code=404, data="更新浏览量失败")
+ 
+    # 新闻详情-相关推荐
+    related_news = await news.get_related_news(
+        db,
+        news_detail.id,
+        news_detail.category_id
+    )
+ 
+    data = {
+        "id": news_detail.id,
+        "title": news_detail.title,
+        "description": news_detail.description,
+        "content": news_detail.content,
+        "image": news_detail.image,
+        "author": news_detail.author,
+        "publishTime": news_detail.publish_time,
+        "categoryId": news_detail.category_id,
+        "views": news_detail.views + 1,
+        "relatedNews": related_news
+    }
+ 
+    return Result.success(data)
